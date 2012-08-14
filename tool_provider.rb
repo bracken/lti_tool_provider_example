@@ -23,6 +23,8 @@ post '/lti_tool' do
   if key = params['oauth_consumer_key']
     if secret = $oauth_creds[key]
       @tp = IMS::LTI::ToolProvider.new(key, secret, params)
+      # Added outcome data extension
+      @tp.extend IMS::LTI::Extensions::OutcomeData::ToolProvider
     else
       @tp = IMS::LTI::ToolProvider.new(nil, nil, params)
       @tp.lti_msg = "Your consumer didn't use a recognized key."
@@ -53,6 +55,8 @@ post '/lti_tool' do
   @username = @tp.username("Dude")
   if @tp.outcome_service?
     # It's a launch for grading
+    @show_text = @tp.accepts_outcome_text?
+    @show_url = @tp.accepts_outcome_url?
     erb :assessment
   else
     # normal tool launch without grade write-back
@@ -70,13 +74,23 @@ post '/assessment' do
   end
 
   @tp = IMS::LTI::ToolProvider.new(key, $oauth_creds[key], session['launch_params'])
+  # Added outcome data extension
+  @tp.extend IMS::LTI::Extensions::OutcomeData::ToolProvider
 
   if !@tp.outcome_service?
     return show_error "This tool wasn't lunched as an outcome service"
   end
 
   # post the given score to the TC
-  res = @tp.post_replace_result!(params['score'])
+  if params['url'] || params['text']
+    data = {}
+    data['url'] = params['url'] if params['url'] && params['url'] != ''
+    data['text'] = params['text'] if params['text'] && params['text'] != ''
+    # post the result along with the outcome url or text
+    res = @tp.post_replace_result_with_data!(params['score'], data)
+  else
+    res = @tp.post_replace_result!(params['score'])
+  end
 
   if res.success?
     @score = params['score']

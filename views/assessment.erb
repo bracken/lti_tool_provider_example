@@ -4,7 +4,24 @@
     <h1>Demo LTI Assessment Tool</h1>
     <form action="/assessment" method="post">
       <p>Hi, <%= @username %>. On a scale of <code>0.0</code> to <code>1.0</code>, how well would you say you did on this assessment?</p>
-      <input name='score' type='text' width='5' id='score' />
+      <table>
+        <tr>
+          <td>score</td>
+          <td><input name='score' type='text' width='5' id='score' /></td>
+        </tr>
+        <% if @show_text %>
+          <tr>
+            <td>text</td>
+            <td><input name='text' type='text' width='50' id='text' /></td>
+          </tr>
+        <% end %>
+        <% if @show_url %>
+          <tr>
+            <td>url</td>
+            <td><input name='url' type='text' width='50' id='url' /></td>
+          </tr>
+        <% end %>
+      </table>
       <input type='submit' value='Submit' />
     </form>
   </body>
