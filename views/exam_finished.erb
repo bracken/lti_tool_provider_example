@@ -1,0 +1,11 @@
+<html>
+<head><title>Student finished exam</title></head>
+<body>
+<p>Your score of <%= @score %> was successfully sent to
+  <%= @tp.tool_consumer_instance_name || "your LMS" %></p>
+
+<p>Measure doesn't have to show a screen like this. Can just send back to LMS</p>
+
+<%= erb :_return_to_lms %>
+</body>
+</html>

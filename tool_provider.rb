@@ -5,26 +5,25 @@ require 'oauth/request_proxy/rack_request'
 
 enable :sessions
 
+AVAILABLE_EXAMS = %w(exam1 exam2 exam3)
+
 get '/' do
+  @available_exams = AVAILABLE_EXAMS
   erb :index
 end
 
 # the consumer keys/secrets
-$oauth_creds = {"test" => "secret", "testing" => "supersecret"}
+$oauth_creds = {"test" => "secret"}
 
 def show_error(message)
   @message = message
   erb :error
 end
 
-# The url for launching the tool
-# It will verify the OAuth signature
-post '/lti_tool' do
+def verify_launch
   if key = params['oauth_consumer_key']
     if secret = $oauth_creds[key]
       @tp = IMS::LTI::ToolProvider.new(key, secret, params)
-      # Added outcome data extension
-      @tp.extend IMS::LTI::Extensions::OutcomeData::ToolProvider
     else
       @tp = IMS::LTI::ToolProvider.new(nil, nil, params)
       @tp.lti_msg = "Your consumer didn't use a recognized key."
@@ -49,24 +48,70 @@ post '/lti_tool' do
     return show_error "Why are you reusing the nonce?"
   end
 
-  # save the launch parameters for use in later request
-  session['launch_params'] = @tp.to_params
+  true
+end
 
-  @username = @tp.username("Dude")
-  if @tp.outcome_service?
-    # It's a launch for grading
-    @show_text = @tp.accepts_outcome_text?
-    @show_url = @tp.accepts_outcome_url?
-    erb :assessment
-  else
-    # normal tool launch without grade write-back
-    @tp.lti_msg = "Sorry that tool was so boring"
-    erb :boring_tool
+post '/admin_launch' do
+  res = verify_launch
+  return res if res.is_a? String
+
+  if !@tp.instructor?
+    return show_error "This user isn't a teacher!"
   end
+
+  if !@tp.lis_person_contact_email_primary
+    return show_error "no email address sent for this launch. Expected the email in the key: lis_person_contact_email_primary"
+  end
+
+  if @exam = @tp.get_custom_param("measure_exam_id")
+    if AVAILABLE_EXAMS.member?(@exam)
+      erb :teacher_exam
+    else
+      return show_error "The exam '#{@exam}' doesn't exist"
+    end
+  else
+    @available_exams = AVAILABLE_EXAMS
+    erb :teacher_admin_area
+  end
+end
+get '/admin_launch' do
+  show_error "This must be launched as a POST not a get"
+end
+
+post '/student_launch' do
+  res = verify_launch
+  return res if res.is_a? String
+
+  if !@tp.student?
+    return show_error "This user isn't a student!"
+  end
+
+  if !@tp.lis_person_contact_email_primary
+    return show_error "no email address sent for this launch. Expected the email in the key: lis_person_contact_email_primary"
+  end
+
+
+  session['launch_params'] = @tp.to_params
+  if !@tp.outcome_service?
+    return show_error "This wasn't launch as an outcome service launch, expected the keys: lis_outcome_service_url && lis_result_sourcedid"
+  end
+
+  if @exam = @tp.get_custom_param("measure_exam_id")
+    if AVAILABLE_EXAMS.member?(@exam)
+      erb :student_exam
+    else
+      return show_error "The exam '#{@exam}' doesn't exist"
+    end
+  else
+    return show_error "No exam specified."
+  end
+end
+get '/student_launch' do
+  show_error "This must be launched as a POST not a get"
 end
 
 # post the assessment results
-post '/assessment' do
+post '/finish_exam' do
   if session['launch_params']
     key = session['launch_params']['oauth_consumer_key']
   else
@@ -74,39 +119,39 @@ post '/assessment' do
   end
 
   @tp = IMS::LTI::ToolProvider.new(key, $oauth_creds[key], session['launch_params'])
-  # Added outcome data extension
-  @tp.extend IMS::LTI::Extensions::OutcomeData::ToolProvider
 
   if !@tp.outcome_service?
     return show_error "This tool wasn't lunched as an outcome service"
   end
 
-  # post the given score to the TC
-  if params['url'] || params['text']
-    data = {}
-    data['url'] = params['url'] if params['url'] && params['url'] != ''
-    data['text'] = params['text'] if params['text'] && params['text'] != ''
-    # post the result along with the outcome url or text
-    res = @tp.post_replace_result_with_data!(params['score'], data)
-  else
-    res = @tp.post_replace_result!(params['score'])
-  end
+  res = @tp.post_replace_result!(params['score'])
 
   if res.success?
     @score = params['score']
     @tp.lti_msg = "Message shown when arriving back at Tool Consumer."
-    erb :assessment_finished
+    erb :exam_finished
   else
     @tp.lti_errormsg = "The Tool Consumer failed to add the score."
     show_error "Your score was not recorded: #{res.description}"
   end
 end
 
-get '/tool_config.xml' do
+get '/admin_config.xml' do
   host = request.scheme + "://" + request.host_with_port
-  url = host + "/lti_tool"
-  tc = IMS::LTI::ToolConfig.new(:title => "Example Sinatra Tool Provider", :launch_url => url)
-  tc.description = "This example LTI Tool Provider supports LIS Outcome pass-back."
+  url = host + "/admin_launch"
+  tc = IMS::LTI::ToolConfig.new(:title => "Measure admin link", :launch_url => url)
+  tc.description = "The endpoint for a Measure admin launch. Can add custom_measure_exam_id to launch a specific exam"
+  tc.set_custom_param("measure_exam_id", "exam1")
+
+  headers 'Content-Type' => 'text/xml'
+  tc.to_xml(:indent => 2)
+end
+get '/student_config.xml' do
+  host = request.scheme + "://" + request.host_with_port
+  url = host + "/student_launch"
+  tc = IMS::LTI::ToolConfig.new(:title => "Measure student link", :launch_url => url)
+  tc.description = "The endpoint for a Measure student launch. Must add custom_measure_exam_id to launch a specific exam"
+  tc.set_custom_param("measure_exam_id", "exam1")
 
   headers 'Content-Type' => 'text/xml'
   tc.to_xml(:indent => 2)

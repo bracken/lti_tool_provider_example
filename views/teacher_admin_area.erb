@@ -1,0 +1,19 @@
+<html>
+<head><title>Teacher exam admin</title></head>
+<body>
+<p>Hi, <%= @username %></p>
+
+<p>Your available exams:</p>
+
+<ul>
+  <% @available_exams.each do |e| %>
+    <li><%= e %></li>
+  <% end %>
+</ul>
+
+<%= erb :_return_to_lms %>
+
+<%= erb :_print_params %>
+
+</body>
+</html>

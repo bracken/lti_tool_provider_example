@@ -1,6 +1,15 @@
 <html>
 <body>
-<p>You should do an lti tool launch at /lti_tool</p>
-<p>You can get the configuration XML here: <a href="/tool_config.xml">LTI Config</a></p>
+
+<p>You can launch this test tool as either a student or a teacher using
+the configurations below.</p>
+<p>It should provide useful error messages for all use cases, if not we can add them easily.</p>
+
+<p>Admin config: <a href="/admin_config.xml">LTI Config XML</a></p>
+<p>Student config: <a href="/student_config.xml">LTI Config XML</a></p>
+
+<p>Key: <%= $oauth_creds.first.first %></p>
+<p>Secret: <%= $oauth_creds.first.last %></p>
+
 </body>
 </html>

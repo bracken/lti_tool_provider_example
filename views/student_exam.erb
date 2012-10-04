@@ -1,0 +1,26 @@
+<html>
+  <head><title>Student taking exam</title></head>
+  <body>
+    <h1>Student taking exam</h1>
+    <form action="/finish_exam" method="post">
+      <p>Hi, <%= @username %>. how well would you say you did on this assessment?</p>
+      <table>
+        <tr>
+          <td>score</td>
+          <td>
+            <select name="score">
+              <% 10.times do |i|
+                 val = "0.#{i}"
+              %>
+                <option value="<%= val %>"><%= val %></option>
+              <% end %>
+              <option value="1">1</option>
+            </select>
+          </td>
+        </tr>
+      </table>
+      <input type='submit' value='Submit' />
+    </form>
+  <%= erb :_print_params %>
+  </body>
+</html>
