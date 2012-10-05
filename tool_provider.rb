@@ -5,6 +5,8 @@ require 'oauth/request_proxy/rack_request'
 
 enable :sessions
 
+set :protection, :only => [:admin_launch, :student_launch]
+
 AVAILABLE_EXAMS = %w(exam1 exam2 exam3)
 
 get '/' do
